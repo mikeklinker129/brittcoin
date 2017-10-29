@@ -23,11 +23,17 @@ keys = list(r_asset_pairs['result'].keys())
 # 	pprint.pprint(pair)
 
 q_str = ''
-for i in range(0,10):
-	q_str+=
+N = 10
+for i in range(0,N):
+	q_str+=keys[i]
+	if i<N-1:
+		q_str+=','
+
+print(q_str)
+
+r_price_data = k.query_public('Ticker', {'pair': q_str})
 
 
 
-# response = k.query_public('Ticker', {'pair': 'XBTUSD,ETHUSD,XBTETH,LTCXBT'})
 # response = k.query_public('Depth', {'pair': 'XXBTZUSD', 'count': '10'})
-# pprint.pprint(response)
+pprint.pprint(r_price_data)
