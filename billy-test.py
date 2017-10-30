@@ -4,7 +4,29 @@ import pprint
 import numpy as np
 from copy import deepcopy
 
-if __name__ == '__main__':
+class Asset():
+    '''
+    This is the main asset type that the tree system will use.
+    It does not matter which exchange this asset came from, as long as the price information is correct.
+    '''
+    def __init__(self, kraken_data, name):
+
+        self.name = name # String of currency name
+        self.avail_trades = [] # Currencies this coin can be converted to
+        self.avail_prices = [] # Parallel list to coin conversion
+        self.exchange = 'Kraken'
+
+        # Find the trades involving "name"
+        for i in range(kraken_data['N']): # Loop over the list of trades
+            if kraken_data['bases'][i] == name: # If the base is "name"
+                self.avail_trades.append(kraken_data['quotes'][i])
+                self.avail_prices.append(kraken_data['prices'][i])
+
+
+def get_prices():
+    '''
+    Get prices from Kraken API
+    '''
 
     k = krakenex.API() # Start the API
     asset_pairs_dict = k.query_public('AssetPairs')['result'] # Get lists of available asset pairs
@@ -42,3 +64,28 @@ if __name__ == '__main__':
     quotes.extend(new_quotes)
     prices.extend(new_prices)
 
+    # Compile into a dictionary and return
+    kraken_data = {
+        'unique': list(set(bases)), # Unique bases
+        'bases' : bases,
+        'quotes': quotes,
+        'prices': prices,
+        'N'     : len(prices)
+    }
+
+    return kraken_data
+
+
+if __name__ == '__main__':
+
+    # Get the data from Kraken
+    kraken_data = get_prices()
+
+    # Loop over the assets and make a list
+    asset_list = []
+    for asset in kraken_data['unique']:
+        # Make an instance of the Asset class with that asset's name
+        exec(asset + '= Asset(kraken_data,\'' + asset + '\')')
+
+        # Append the Asset instance to the list
+        asset_list.append(eval(asset))
