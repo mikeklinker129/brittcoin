@@ -3,6 +3,7 @@ import sys
 import pprint
 import numpy as np
 from copy import deepcopy
+import time
 
 # https://cryptocoincharts.info/markets/show/kraken
 
@@ -58,10 +59,12 @@ class PathList():
     def show_paths(self):
 
         self.complete_paths.sort(key=lambda r: -r.value)
-        # for i in range(0,1):
-        for i in range(0,len(self.complete_paths)):
-            self.complete_paths[i].print_path()
-
+        for i in range(0,1):
+        # for i in range(0,len(self.complete_paths)):
+            try:
+                self.complete_paths[i].print_path()
+            except:
+                continue
 
 class Path(object):
     def __init__(self,init_node, links = []):
@@ -87,8 +90,14 @@ class Path(object):
         for node in self.nodes:
             node_names.append(node.name)
         est_fee = .9974**len(self.links)
-        if est_fee*self.value>1.0:
-            print("Nodes: %s  Full Value: %.6f Est With Fees: %.6f" %(','.join(node_names), self.value, self.value*est_fee ))
+
+
+        if self.value>1.0:
+            print("Nodes: %s  Full Percentage: %.6f Est Percentage With Fees: %.6f" %(','.join(node_names), self.value*100, self.value*est_fee*100 ))
+            
+            if self.value*est_fee>1:
+                print("FUCK YEHHHHHHHHHHHHHH BUY THT SHIT")
+
             # print("Price Info:")
             # list_links = []
             # for i in range(0,len(node_names)-1):
@@ -149,20 +158,26 @@ def get_prices():
 
     # Loop over the prices to make a list like pairs, bases, quotes
     prices = []
-    for pair_name, data in price_dict.items():
-        prices.append(float(data['a'][0])) # Append the ask price (this is how you access it...)
+    prices_ask = []
+    prices_bid = []
 
+    for pair_name, data in price_dict.items():
+        prices_ask.append(float(data['a'][0])) # Append the ask price (this is how you access it...)
+        prices_bid.append(float(data['b'][0])) # List of the bid prices
     # Now we have lists of one-way exchanges
     # Complete the exchange lists by adding the other direction
+
+    prices = prices_bid 
+    inv_prices = [1./p for p in prices_ask] # New prices are the inverse prices
 
     # Append the "quotes" list to the end of the "bases" list, and vice versa
     new_bases  = deepcopy(quotes)
     new_quotes = deepcopy(bases)
-    new_prices = [1./price for price in prices] # New prices are the inverse prices
+
 
     bases.extend(new_bases)
     quotes.extend(new_quotes)
-    prices.extend(new_prices)
+    prices.extend(inv_prices)
 
     # Compile into a dictionary and return
     kraken_data = {
@@ -178,37 +193,39 @@ def get_prices():
 
 if __name__ == '__main__':
 
+    while True:
     # Get the data from Kraken
-    kraken_data = get_prices()
+        kraken_data = get_prices()
 
-    # Loop over the assets and make a list
-    asset_list = []
-    for asset in kraken_data['unique']:
-        # Make an instance of the Asset class with that asset's name
-        exec(asset + '= Asset(kraken_data,\'' + asset + '\')')
+        # Loop over the assets and make a list
+        asset_list = []
+        for asset in kraken_data['unique']:
+            # Make an instance of the Asset class with that asset's name
+            exec(asset + '= Asset(kraken_data,\'' + asset + '\')')
 
-        # Append the Asset instance to the list
-        asset_list.append(eval(asset))
+            # Append the Asset instance to the list
+            asset_list.append(eval(asset))
 
-    trial_list = []
+        trial_list = []
 
-    for asset in asset_list:
-        if asset.name in ['XXBT','XETH','XMLN']:
-            # print(asset.name, asset.avail_trades)
-            trial_list.append(asset)
-        # if asset.name=='XETH':
-        #     trial_list.append(asset)
+        for asset in asset_list:
+            if asset.name in ['XXBT','XETH','XMLN']:
+                # print(asset.name, asset.avail_trades)
+                trial_list.append(asset)
+            # if asset.name=='XETH':
+            #     trial_list.append(asset)
 
-    
+        
+        trial_list = asset_list
+        master_path = PathList(asset_list,trial_list)
+        # print("god help us")
+        for i in range(0,4):
+            # print(i)
+            master_path.step()
 
-    master_path = PathList(asset_list,asset_list)
-    print("god help us")
-    for i in range(0,4):
-        print(i)
-        master_path.step()
+        master_path.show_paths()
 
-    master_path.show_paths()
-
+        time.sleep(1)
 
 
 
