@@ -23,15 +23,16 @@ r_asset_pairs = k.query_public('AssetPairs')
 # pprint.pprint(r_asset_pairs['result'].keys())
 list_pairs = r_asset_pairs['result'].keys()
 for a in list_pairs:
-    if 'XETH' in a:
+    if 'XMLN' in a:
         print(a)
-        
+
 # pprint.pprint(list_pairs)
 # if 'XETH' in list_pairs:
 #     print()
 
-r_price_data = k.query_public('Ticker', {'pair': 'XETHXXBT'} )
 
+
+r_price_data = k.query_public('Ticker', {'pair': 'XMLNXXBT,XMLNXETH'} )
 pprint.pprint(r_price_data)
 
 

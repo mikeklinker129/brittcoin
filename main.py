@@ -78,8 +78,15 @@ class BrittCoinMiner(object):
 
             # If the asset does not exist, make a shell asset object. Will be filled in later. 
             if not asset_exists:
-                
+                ass = Asset(ap.base)
+                self.asset_list.append(ass)
 
+        #ready to fill in the shells
+        for asset in self.asset_list:
+            #Find all the instances where this asset is the base, apply the price forwards
+            
+
+            #Find all the instances where the asset is the quote, apply the price backwards. 
 
 
 
@@ -131,9 +138,9 @@ class Asset(object):
     This is the main asset type that the tree system will use. 
     It does not matter which exchange this asset came from, as long as the price information is correct.
     '''
-    def __init__(self):
+    def __init__(self,name):
 
-        self.name = '' #string of currency name
+        self.name = name #string of currency name
         self.avail_trades = [] #currencies this coin can be converted to
         self.avail_prices = [] #Parallel list to coin conversion
         self.exchange = ''

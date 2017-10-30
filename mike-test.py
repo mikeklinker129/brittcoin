@@ -4,72 +4,129 @@ import pprint
 import numpy as np
 from copy import deepcopy
 
+# https://cryptocoincharts.info/markets/show/kraken
 
 
 class PathList():
-    __init__(self, assets):
+    def __init__(self, all_assets, start_points):
         self.path_list = []
         self.complete_paths = []
-        self.initialize(assets)
+        self.initialize(start_points)
+        self.asset_list = all_assets
 
     def initialize(self,asset_list):
-    	for asset in asset_list:
-    		new_path = Path( [asset] )  
-    		self.path_list.append(new_path)
+        for asset in asset_list:
+            new_path = Path( [asset] )  
+            self.path_list.append(new_path)
 
     
     def step(self):
+        new_path_list = []
+
         for path in self.path_list:
 
-        	starting_nodes = list(path.node)
-           	starting_links = list(path.links)
-           	next_moves  = path.node[-1].avail_trades
-           	next_prices = path.node[-1].avail_prices
+            next_moves  = path.nodes[-1].avail_trades
+            # print('Next Moves: ',next_moves)
 
-           	self.path_list.remove(path)
+            for i in range(0,len(next_moves)):
+                move = next_moves[i]
+                # print("Move: ",move)
+                link = path.nodes[-1].avail_prices[i]
+            # for move in next_moves:
+                #move is a string
+                for asset in self.asset_list:
 
-           	# for move in next_moves:
-           	for i in range(0,len(next_moves)):
-           		move = next_moves[i]
-           		link = next_prices[i]
-               	new_path = Path(starting_nodes+[move], starting_links+[link])
-               	self.path_list.append(new_path)
+                    if asset.name==move:
+                        move_asset = asset
+                new_nodes = (path.nodes+[move_asset])
+                new_links = (path.links+[ link ])
+                new_path = Path(new_nodes, new_links)
+                new_path_list.append(new_path)
+
+        self.path_list = new_path_list
 
         self.remove_complete_paths()
 
     def remove_complete_paths(self):
-    	for path in self.path_list:
-    		if path.is_complete():
-    			self.complete_paths.append(path)
-    			self.path_list.remove(path)
-    			if path.value>1:
-    				print('maybe we will make some money MN: ',path.value)
+        for path in self.path_list:
+            if path.is_complete():
+                self.complete_paths.append(path)
+                self.path_list.remove(path)
+                # if path.value>1:
+                # print('maybe we will make some money MN: ',path.value)
+
+    def show_paths(self):
+
+        self.complete_paths.sort(key=lambda r: -r.value)
+        # for i in range(0,1):
+        for i in range(0,len(self.complete_paths)):
+            self.complete_paths[i].print_path()
 
 
 class Path(object):
     def __init__(self,init_node, links = []):
         self.nodes = init_node # list of Asset objects
         self.links = links    # list of numbers that link each node
-        self.value = product(self.link)  
+        self.value = self.compute_val()  
         self.length = len(self.nodes)
 
-
+    def compute_val(self):
+        product = 1
+        for l in self.links:
+            product*=l
+        return product
 
     def is_complete(self):
-    	if self.nodes[0]==self.nodes[-1]:
-    		return True
-    	else:
-    		return False
+        if self.nodes[0]==self.nodes[-1]:
+            return True
+        else:
+            return False
 
     def print_path(self):
-    	print("Nodes: %s  Value: %s" %(','.join(self.nodes), self.value ))
+        node_names = []
+        for node in self.nodes:
+            node_names.append(node.name)
+        est_fee = .9974**len(self.links)
+        if est_fee*self.value>1.0:
+            print("Nodes: %s  Full Value: %.6f Est With Fees: %.6f" %(','.join(node_names), self.value, self.value*est_fee ))
+            # print("Price Info:")
+            # list_links = []
+            # for i in range(0,len(node_names)-1):
+            #     list_links.append(node_names[i]+node_names[i+1])
+            # kk = krakenex.API()
+            # for link in list_links:
+            #     r = kk.query_public('Ticker', {'pair': link} )
+            #     pprint.pprint(r)
+
     # def __append__():
     #     check left, check right
     #     update value
 
 
 
-if __name__ == '__main__':
+class Asset():
+    '''
+    This is the main asset type that the tree system will use.
+    It does not matter which exchange this asset came from, as long as the price information is correct.
+    '''
+    def __init__(self, kraken_data, name):
+
+        self.name = name # String of currency name
+        self.avail_trades = [] # Currencies this coin can be converted to
+        self.avail_prices = [] # Parallel list to coin conversion
+        self.exchange = 'Kraken'
+
+        # Find the trades involving "name"
+        for i in range(kraken_data['N']): # Loop over the list of trades
+            if kraken_data['bases'][i] == name: # If the base is "name"
+                self.avail_trades.append(kraken_data['quotes'][i])
+                self.avail_prices.append(kraken_data['prices'][i])
+
+
+def get_prices():
+    '''
+    Get prices from Kraken API
+    '''
 
     k = krakenex.API() # Start the API
     asset_pairs_dict = k.query_public('AssetPairs')['result'] # Get lists of available asset pairs
@@ -107,27 +164,50 @@ if __name__ == '__main__':
     quotes.extend(new_quotes)
     prices.extend(new_prices)
 
+    # Compile into a dictionary and return
+    kraken_data = {
+        'unique': list(set(bases)), # Unique bases
+        'bases' : bases,
+        'quotes': quotes,
+        'prices': prices,
+        'N'     : len(prices)
+    }
 
-    all_assets = []
-
-    MasterPathList = PathList(all_assets)
-
-
-
-
-
-
-
-
+    return kraken_data
 
 
+if __name__ == '__main__':
 
+    # Get the data from Kraken
+    kraken_data = get_prices()
 
+    # Loop over the assets and make a list
+    asset_list = []
+    for asset in kraken_data['unique']:
+        # Make an instance of the Asset class with that asset's name
+        exec(asset + '= Asset(kraken_data,\'' + asset + '\')')
 
+        # Append the Asset instance to the list
+        asset_list.append(eval(asset))
 
+    trial_list = []
 
+    for asset in asset_list:
+        if asset.name in ['XXBT','XETH','XMLN']:
+            # print(asset.name, asset.avail_trades)
+            trial_list.append(asset)
+        # if asset.name=='XETH':
+        #     trial_list.append(asset)
 
+    
 
+    master_path = PathList(asset_list,asset_list)
+    print("god help us")
+    for i in range(0,4):
+        print(i)
+        master_path.step()
+
+    master_path.show_paths()
 
 
 
