@@ -93,7 +93,7 @@ class Path(object):
 
 
         if self.value>1.0:
-            print("Nodes: %s  Full Percentage: %.6f Est Percentage With Fees: %.6f" %(','.join(node_names), self.value*100, self.value*est_fee*100 ))
+            print("Nodes: %s  Full Percentage: %.6f With Fees: %.6f" %(','.join(node_names), self.value*100, self.value*est_fee*100 ))
             
             if self.value*est_fee>1:
                 print("FUCK YEHHHHHHHHHHHHHH BUY THT SHIT")
@@ -209,7 +209,7 @@ if __name__ == '__main__':
         trial_list = []
 
         for asset in asset_list:
-            if asset.name in ['XXBT','XETH','XMLN']:
+            if asset.name in ['XXBT','XETH']:
                 # print(asset.name, asset.avail_trades)
                 trial_list.append(asset)
             # if asset.name=='XETH':
