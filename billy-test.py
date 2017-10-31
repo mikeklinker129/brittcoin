@@ -13,15 +13,14 @@ class Asset():
 
         self.name = name # String of currency name
         self.avail_trades = [] # Currencies this coin can be converted to
-        self.avail_prices = [] # Parallel list to coin conversion
+        self.conversions  = [] # Parallel list to coin conversion
         self.exchange = 'Kraken'
 
         # Find the trades involving "name"
         for i in range(kraken_data['N']): # Loop over the list of trades
-            if kraken_data['bases'][i] == name: # If the base is "name"
-                self.avail_trades.append(kraken_data['quotes'][i])
-                self.avail_prices.append(kraken_data['prices'][i])
-
+            if kraken_data['haves'][i] == name: # If the base is "name"
+                self.avail_trades.append(kraken_data['wants'][i])
+                self.conversions.append(kraken_data['conversions'][i])
 
 def get_prices():
     '''
@@ -33,44 +32,53 @@ def get_prices():
 
     # Loop over the asset pairs to get the pair, base, and quote strings
     pairs = []
-    bases = []
-    quotes = []
+    haves = []
+    wants = []
     for pair_name, data in asset_pairs_dict.items():
         if not pair_name[-2:] == '.d': # Dont search "dark pool pairs" - only 50 BTC or more!
             pairs.append(pair_name)      # Append the name of the pair
-            bases.append(data['base'])   # Append the base currency (quote denomination)
-            quotes.append(data['quote']) # Append the quote
+            haves.append(data['base'])   # Append the currency that you have (referred to as the base in Kraken)
+            wants.append(data['quote'])  # Append the curreny that you want (referred to as the quote in Kraken)
 
     # Make a comma-separated string from the list of pair names
     pair_string = ','.join(pairs)
 
-    # Call the Kraken API to get all the prices
-    price_dict = k.query_public('Ticker', {'pair': pair_string} )['result']
+    # Call the Kraken API to get all the conversion factors
+    conversion_dict = k.query_public('Ticker', {'pair': pair_string} )['result']
 
-    # Loop over the prices to make a list like pairs, bases, quotes
-    prices = []
-    for pair_name, data in price_dict.items():
-        prices.append(float(data['a'][0])) # Append the ask price (this is how you access it...)
+    # Get the asks and bids for each asset pair
+    asks = []
+    bids = []
+    for pair_name, data in conversion_dict.items():
+        asks.append(float(data['a'][0]))
+        bids.append(float(data['b'][0]))
 
     # Now we have lists of one-way exchanges
     # Complete the exchange lists by adding the other direction
 
-    # Append the "quotes" list to the end of the "bases" list, and vice versa
-    new_bases  = deepcopy(quotes)
-    new_quotes = deepcopy(bases)
-    new_prices = [1./price for price in prices] # New prices are the inverse prices
+    # Append the "wants" list to the end of the "haves" list, and vice versa
+    new_wants = deepcopy(haves)
+    new_haves = deepcopy(wants)
+    wants.extend(new_wants)
+    haves.extend(new_haves)
 
-    bases.extend(new_bases)
-    quotes.extend(new_quotes)
-    prices.extend(new_prices)
+    # Create a conversions list
+    # From wants to haves you convert with the bid and the maker fee (0.16%)
+    # From haves to wants you convert with 1/ask and the taker fee (0.26%)
+    # Example: Asset pair XBTUSD, base = have XBT, quote = want USD, conversion: 1 XBT -> 5000 USD, "selling" XBT for USD, so you are the "maker"
+
+    conversions = [bid * (1. - 0.0016) for bid in bids]
+    conversions.extend([(1. - 0.0026)/ask for ask in asks])
+
+
 
     # Compile into a dictionary and return
     kraken_data = {
-        'unique': list(set(bases)), # Unique bases
-        'bases' : bases,
-        'quotes': quotes,
-        'prices': prices,
-        'N'     : len(prices)
+        'unique'     : list(set(haves)), # Unique currencies you have
+        'haves'      : haves,
+        'wants'      : wants,
+        'conversions': conversions,
+        'N'          : len(haves)
     }
 
     return kraken_data
@@ -89,3 +97,4 @@ if __name__ == '__main__':
 
         # Append the Asset instance to the list
         asset_list.append(eval(asset))
+
