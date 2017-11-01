@@ -101,7 +101,7 @@ class Path(object):
 
 
         if self.value > .999:
-            print("Nodes: %s  Percent: %.6f  Links: %s  Pairs: %s" %(','.join(node_names), self.value*100, self.directions, self.asset_pairs))
+            print("Nodes: %s  Percent: %.6f  Dir: %s  Pairs: %s Links: %s" %(','.join(node_names), self.value*100, self.directions, self.asset_pairs, self.links))
             
             if self.value>1.0:
                 print("FUCK YEHHHHHHHHHHHHHH BUY THT SHIT")
