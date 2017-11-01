@@ -32,16 +32,21 @@ class PathList():
             for i in range(0,len(next_moves)):
                 move = next_moves[i]
                 # print("Move: ",move)
-                link = path.nodes[-1].avail_prices[i]
-            # for move in next_moves:
+                link = path.nodes[-1].conversions[i]
+                direction = path.nodes[-1].actions[i]
+                asset_pair = path.nodes[-1].pair_name[i]
+
                 #move is a string
                 for asset in self.asset_list:
-
                     if asset.name==move:
                         move_asset = asset
+
                 new_nodes = (path.nodes+[move_asset])
                 new_links = (path.links+[ link ])
-                new_path = Path(new_nodes, new_links)
+                new_directions = (path.directions+ [ direction ])
+                new_asset_pair = (path.asset_pairs+ [ asset_pair ])
+
+                new_path = Path(new_nodes, new_links, new_directions, new_asset_pair)
                 new_path_list.append(new_path)
 
         self.path_list = new_path_list
@@ -67,9 +72,12 @@ class PathList():
                 continue
 
 class Path(object):
-    def __init__(self,init_node, links = []):
+    def __init__(self,init_node, links = [], directions = [], asset_pairs = [] ):
         self.nodes = init_node # list of Asset objects
         self.links = links    # list of numbers that link each node
+        self.directions = directions
+        self.asset_pairs = asset_pairs
+
         self.value = self.compute_val()  
         self.length = len(self.nodes)
 
@@ -89,13 +97,13 @@ class Path(object):
         node_names = []
         for node in self.nodes:
             node_names.append(node.name)
-        est_fee = .9974**len(self.links)
+        # est_fee = .9974**len(self.links)
 
 
-        if self.value>1.0:
-            print("Nodes: %s  Full Percentage: %.6f With Fees: %.6f" %(','.join(node_names), self.value*100, self.value*est_fee*100 ))
+        if self.value > .999:
+            print("Nodes: %s  Percent: %.6f  Links: %s  Pairs: %s" %(','.join(node_names), self.value*100, self.directions, self.asset_pairs))
             
-            if self.value*est_fee>1:
+            if self.value>1.0:
                 print("FUCK YEHHHHHHHHHHHHHH BUY THT SHIT")
 
             # print("Price Info:")
@@ -122,14 +130,20 @@ class Asset():
 
         self.name = name # String of currency name
         self.avail_trades = [] # Currencies this coin can be converted to
-        self.avail_prices = [] # Parallel list to coin conversion
+        self.conversions  = [] # Parallel list to coin conversion
+        self.pair_name = []    # The pair name that is used to go from this asset to avail_trades
+        self.actions = []      # The direction (buy or sell) that you use to go from this asset to avail_trades
         self.exchange = 'Kraken'
+
+
 
         # Find the trades involving "name"
         for i in range(kraken_data['N']): # Loop over the list of trades
-            if kraken_data['bases'][i] == name: # If the base is "name"
-                self.avail_trades.append(kraken_data['quotes'][i])
-                self.avail_prices.append(kraken_data['prices'][i])
+            if kraken_data['haves'][i] == name: # If the base is "name"
+                self.avail_trades.append(kraken_data['wants'][i])
+                self.conversions.append(kraken_data['conversions'][i])
+                self.pair_name.append(kraken_data['pairs'][i])
+                self.actions.append(kraken_data['buy_dir'][i])
 
 
 def get_prices():
@@ -142,50 +156,66 @@ def get_prices():
 
     # Loop over the asset pairs to get the pair, base, and quote strings
     pairs = []
-    bases = []
-    quotes = []
+    haves = []
+    wants = []
+    buy_direction = []
+    rev_direction = []
+
     for pair_name, data in asset_pairs_dict.items():
         if not pair_name[-2:] == '.d': # Dont search "dark pool pairs" - only 50 BTC or more!
             pairs.append(pair_name)      # Append the name of the pair
-            bases.append(data['base'])   # Append the base currency (quote denomination)
-            quotes.append(data['quote']) # Append the quote
+            haves.append(data['base'])   # Append the currency that you have (referred to as the base in Kraken)
+            wants.append(data['quote'])  # Append the curreny that you want (referred to as the quote in Kraken)
+            buy_direction.append('sell') # To go from have to want, you have to use a 'sell' operation.
+            rev_direction.append('buy')  # To go from want to have, you have to use a 'buy' operation.
+
 
     # Make a comma-separated string from the list of pair names
     pair_string = ','.join(pairs)
 
-    # Call the Kraken API to get all the prices
-    price_dict = k.query_public('Ticker', {'pair': pair_string} )['result']
+    # Call the Kraken API to get all the conversion factors
+    conversion_dict = k.query_public('Ticker', {'pair': pair_string} )['result']
 
-    # Loop over the prices to make a list like pairs, bases, quotes
-    prices = []
-    prices_ask = []
-    prices_bid = []
+    # Get the asks and bids for each asset pair
+    asks = []
+    bids = []
+    for pair_name, data in conversion_dict.items():
+        asks.append(float(data['a'][0]))
+        bids.append(float(data['b'][0]))
 
-    for pair_name, data in price_dict.items():
-        prices_ask.append(float(data['a'][0])) # Append the ask price (this is how you access it...)
-        prices_bid.append(float(data['b'][0])) # List of the bid prices
     # Now we have lists of one-way exchanges
     # Complete the exchange lists by adding the other direction
 
-    prices = prices_bid 
-    inv_prices = [1./p for p in prices_ask] # New prices are the inverse prices
+    # Append the "wants" list to the end of the "haves" list, and vice versa
+    new_wants = deepcopy(haves)
+    new_haves = deepcopy(wants)
+    wants.extend(new_wants)
+    haves.extend(new_haves)
 
-    # Append the "quotes" list to the end of the "bases" list, and vice versa
-    new_bases  = deepcopy(quotes)
-    new_quotes = deepcopy(bases)
+    # You will need the pairs to place the order later. Just repeat it 
+    pairs.extend(pairs)
+    # For a given index, you need to know the pair and the direction (buy or sell) to go from your have to want. 
+    buy_direction.extend(rev_direction)
 
+    # Create a conversions list
+    # From wants to haves you convert with the bid and the maker fee (0.16%)
+    # From haves to wants you convert with 1/ask and the taker fee (0.26%)
+    # Example: Asset pair XBTUSD, base = have XBT, quote = want USD, conversion: 1 XBT -> 5000 USD, "selling" XBT for USD, so you are the "maker"
 
-    bases.extend(new_bases)
-    quotes.extend(new_quotes)
-    prices.extend(inv_prices)
+    conversions = [bid * (1. - 0.0016) for bid in bids]
+    conversions.extend([(1. - 0.0026)/ask for ask in asks])
+    # conversions = [bid*1.0  for bid in bids]
+    # conversions.extend([(1.0)/ask for ask in asks])
 
     # Compile into a dictionary and return
     kraken_data = {
-        'unique': list(set(bases)), # Unique bases
-        'bases' : bases,
-        'quotes': quotes,
-        'prices': prices,
-        'N'     : len(prices)
+        'unique'     : list(set(haves)), # Unique currencies you have
+        'pairs'      : pairs,
+        'haves'      : haves,
+        'wants'      : wants,
+        'conversions': conversions,
+        'buy_dir'    : buy_direction,
+        'N'          : len(haves)
     }
 
     return kraken_data
@@ -195,7 +225,13 @@ if __name__ == '__main__':
 
     while True:
     # Get the data from Kraken
-        kraken_data = get_prices()
+    # Get the data from Kraken
+
+        try:
+            kraken_data = get_prices()
+        except Exception as e:
+            time.sleep(5)
+            continue    
 
         # Loop over the assets and make a list
         asset_list = []
@@ -216,16 +252,15 @@ if __name__ == '__main__':
             #     trial_list.append(asset)
 
         
-        trial_list = asset_list
+        # trial_list = asset_list
         master_path = PathList(asset_list,trial_list)
         # print("god help us")
         for i in range(0,4):
-            # print(i)
             master_path.step()
 
         master_path.show_paths()
 
-        time.sleep(1)
+        time.sleep(0)
 
 
 
