@@ -31,10 +31,12 @@ class PathList():
 
             for i in range(0,len(next_moves)):
                 move = next_moves[i]
-                # print("Move: ",move)
+                
+                # THESE ARE THE PREVIOUS LISTS> TO BE APPENDED.
                 link = path.nodes[-1].conversions[i]
                 direction = path.nodes[-1].actions[i]
                 asset_pair = path.nodes[-1].pair_name[i]
+                vol_currency = path.nodes[-1].vol_currency[i]
 
                 #move is a string
                 for asset in self.asset_list:
@@ -45,8 +47,9 @@ class PathList():
                 new_links = (path.links+[ link ])
                 new_directions = (path.directions+ [ direction ])
                 new_asset_pair = (path.asset_pairs+ [ asset_pair ])
+                new_vol_currency = (path.vol_currency + [ vol_currency ])
 
-                new_path = Path(new_nodes, new_links, new_directions, new_asset_pair)
+                new_path = Path(new_nodes, new_links, new_directions, new_asset_pair, new_vol_currency)
                 new_path_list.append(new_path)
 
         self.path_list = new_path_list
@@ -71,12 +74,18 @@ class PathList():
             except:
                 continue
 
+
+    def return_best(self):
+        self.complete_paths.sort(key=lambda r: -r.value)
+        return self.complete_paths[0]
+
 class Path(object):
-    def __init__(self,init_node, links = [], directions = [], asset_pairs = [] ):
+    def __init__(self,init_node, links = [], directions = [], asset_pairs = [], vol_currency = [] ):
         self.nodes = init_node # list of Asset objects
         self.links = links    # list of numbers that link each node
         self.directions = directions
         self.asset_pairs = asset_pairs
+        self.vol_currency = vol_currency
 
         self.value = self.compute_val()  
         self.length = len(self.nodes)
@@ -99,21 +108,9 @@ class Path(object):
             node_names.append(node.name)
         # est_fee = .9974**len(self.links)
 
-
         if self.value > .999:
-            print("Nodes: %s  Percent: %.6f  Dir: %s  Pairs: %s Links: %s" %(','.join(node_names), self.value*100, self.directions, self.asset_pairs, self.links))
+            print("Nodes: %s  Percent: %.6f  Dir: %s  Pairs: %s Links: %s vol_curr: %s" %(','.join(node_names), self.value*100, self.directions, self.asset_pairs, self.links, self.vol_currency))
             
-            if self.value>1.0:
-                print("FUCK YEHHHHHHHHHHHHHH BUY THT SHIT")
-
-            # print("Price Info:")
-            # list_links = []
-            # for i in range(0,len(node_names)-1):
-            #     list_links.append(node_names[i]+node_names[i+1])
-            # kk = krakenex.API()
-            # for link in list_links:
-            #     r = kk.query_public('Ticker', {'pair': link} )
-            #     pprint.pprint(r)
 
     # def __append__():
     #     check left, check right
@@ -134,6 +131,7 @@ class Asset():
         self.pair_name = []    # The pair name that is used to go from this asset to avail_trades
         self.actions = []      # The direction (buy or sell) that you use to go from this asset to avail_trades
         self.exchange = 'Kraken'
+        self.vol_currency = [] # The currency that this asset uses in a given asset pair in volume calculations
 
 
 
@@ -144,7 +142,7 @@ class Asset():
                 self.conversions.append(kraken_data['conversions'][i])
                 self.pair_name.append(kraken_data['pairs'][i])
                 self.actions.append(kraken_data['buy_dir'][i])
-
+                self.vol_currency.append(kraken_data['vol_currency'][i])
 
 def get_prices():
     '''
@@ -160,6 +158,7 @@ def get_prices():
     wants = []
     buy_direction = []
     rev_direction = []
+    vol_currency = []
 
     for pair_name, data in asset_pairs_dict.items():
         if not pair_name[-2:] == '.d': # Dont search "dark pool pairs" - only 50 BTC or more!
@@ -168,6 +167,7 @@ def get_prices():
             wants.append(data['quote'])  # Append the curreny that you want (referred to as the quote in Kraken)
             buy_direction.append('sell') # To go from have to want, you have to use a 'sell' operation.
             rev_direction.append('buy')  # To go from want to have, you have to use a 'buy' operation.
+            vol_currency.append(data['base'])
 
 
     # Make a comma-separated string from the list of pair names
@@ -189,8 +189,11 @@ def get_prices():
     # Append the "wants" list to the end of the "haves" list, and vice versa
     new_wants = deepcopy(haves)
     new_haves = deepcopy(wants)
+    cp_vol_curr = deepcopy(vol_currency) # volume currency stays the same even if the direction changes. 
+
     wants.extend(new_wants)
     haves.extend(new_haves)
+    vol_currency.extend(cp_vol_curr)
 
     # You will need the pairs to place the order later. Just repeat it 
     pairs.extend(pairs)
@@ -209,13 +212,14 @@ def get_prices():
 
     # Compile into a dictionary and return
     kraken_data = {
-        'unique'     : list(set(haves)), # Unique currencies you have
-        'pairs'      : pairs,
-        'haves'      : haves,
-        'wants'      : wants,
-        'conversions': conversions,
-        'buy_dir'    : buy_direction,
-        'N'          : len(haves)
+        'unique'       : list(set(haves)), # Unique currencies you have
+        'pairs'        : pairs,
+        'haves'        : haves,
+        'wants'        : wants,
+        'conversions'  : conversions,
+        'buy_dir'      : buy_direction,
+        'vol_currency' : vol_currency,
+        'N'            : len(haves)
     }
 
     return kraken_data
@@ -259,6 +263,7 @@ if __name__ == '__main__':
             master_path.step()
 
         master_path.show_paths()
+        best_path = master_path.return_best()
 
         time.sleep(0)
 
