@@ -14,6 +14,9 @@ class Asset():
         self.name = name # String of currency name
         self.avail_trades = [] # Currencies this coin can be converted to
         self.conversions  = [] # Parallel list to coin conversion
+        self.pair_names   = [] # Names of the currency pair you will actually trade on the exchange
+        self.actions      = [] # 'BUY' or 'SELL'
+        self.max_amounts  = [] # Max amount you can trade (the bid/ask size), in denomination of the asset
         self.exchange = 'Kraken'
 
         # Find the trades involving "name"
@@ -62,10 +65,16 @@ def get_prices():
     wants.extend(new_wants)
     haves.extend(new_haves)
 
+    # Create the actions (buy/sell) list
+    # Going from a have to a want is a SELL in the Kraken nomenclature
+    # Example: Asset pair XXBTZUSD, if you have XBT and want USD, you are selling XBT for USD
+    actions = ['SELL' for bid in bids]
+    actions.extend(['BUY' for bid in bids])
+
     # Create a conversions list
     # From wants to haves you convert with the bid and the maker fee (0.16%)
     # From haves to wants you convert with 1/ask and the taker fee (0.26%)
-    # Example: Asset pair XBTUSD, base = have XBT, quote = want USD, conversion: 1 XBT -> 5000 USD, "selling" XBT for USD, so you are the "maker"
+    # Example: Asset pair XXBTZUSD, base=have XBT, quote=want USD, conversion: 1 XBT -> 5000 USD, "selling" XBT for USD, so you are the "maker"
 
     conversions = [bid * (1. - 0.0016) for bid in bids]
     conversions.extend([(1. - 0.0026)/ask for ask in asks])
@@ -78,6 +87,7 @@ def get_prices():
         'haves'      : haves,
         'wants'      : wants,
         'conversions': conversions,
+        'actions'    : actions,
         'N'          : len(haves)
     }
 
