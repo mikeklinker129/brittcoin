@@ -120,7 +120,7 @@ class Trader(object):
                     break
 
 
-        end_bal = self.check_balance(self.vol_currency_list[-1])
+        end_bal = self.check_balance(self.vol_currency_list[0])
         print("Ending Balance: %s   Profit: %s" %(end_bal, (end_bal/start_bal) ))
 
         return end_bal>start_bal
