@@ -108,8 +108,8 @@ class Path(object):
             node_names.append(node.name)
         # est_fee = .9974**len(self.links)
 
-        if self.value > .999:
-            print("Nodes: %s  Percent: %.6f  Dir: %s  Pairs: %s Links: %s vol_curr: %s" %(','.join(node_names), self.value*100, self.directions, self.asset_pairs, self.links, self.vol_currency))
+        if self.value > .99:
+            print("Nodes= %s \nPercent= %.6f \nDirections= %s \nPairs= %s \nLinks= %s \nVolC= %s \n\n\n" %((node_names), self.value*100, self.directions, self.asset_pairs, self.links, self.vol_currency))
             
 
     # def __append__():
@@ -249,7 +249,7 @@ if __name__ == '__main__':
         trial_list = []
 
         for asset in asset_list:
-            if asset.name in ['XXBT','XETH']:
+            if asset.name in ['XXBT']:
                 # print(asset.name, asset.avail_trades)
                 trial_list.append(asset)
             # if asset.name=='XETH':
