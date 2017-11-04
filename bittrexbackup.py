@@ -32,18 +32,28 @@ class PathList():
             next_moves  = path.nodes[-1].avail_trades
             # print('Next Moves: ',next_moves)
 
+            # If we're on the final step, return to the initial asset
             if final_step:
+                # Next move returns you to the original asset
                 next_moves = [path.nodes[0].name]
 
+                # Get the index of the original asset from the list of available trades
+                complete_loop_index = path.nodes[-1].avail_trades.index(next_moves[0])
+
             for i in range(0,len(next_moves)):
+
                 move = next_moves[i]
-                
+
+                # If its the last step, correct the index for the particular trade you want
+                if final_step:
+                    i = complete_loop_index
+
                 # THESE ARE THE PREVIOUS LISTS> TO BE APPENDED.
-                link = path.nodes[-1].conversions[i]
-                direction = path.nodes[-1].order_actions[i]
-                asset_pair = path.nodes[-1].pair_names[i]
+                link             = path.nodes[-1].conversions[i]
+                direction        = path.nodes[-1].order_actions[i]
+                asset_pair       = path.nodes[-1].pair_names[i]
                 order_vol_denoms = path.nodes[-1].order_vol_denoms[i]
-                btc_volumes = path.nodes[-1].btc_volumes[i]
+                btc_volumes      = path.nodes[-1].btc_volumes[i]
 
                 #move is a string
                 for asset in self.asset_list:
@@ -191,11 +201,11 @@ def get_prices(B):
     print("Market Summary Response Time: %.4f" %((t1-t0).total_seconds()))
 
     # Loop over the asset pairs to get the pair, base, and quote strings
-    pairs = []
-    haves = []
-    wants = []    
-    asks     = []
-    bids     = []
+    pairs       = []
+    haves       = []
+    wants       = []
+    asks        = []
+    bids        = []
     btc_volumes = []
     N = 0 # Number of pairs
 
@@ -274,8 +284,10 @@ def get_prices(B):
     # Now we have lists of one-way exchanges
     # Complete the exchange lists by adding the other direction
     # Append the "wants" list to the end of the "haves" list, and vice versa
-    wants.extend(deepcopy(haves))
-    haves.extend(deepcopy(wants))
+    new_wants = deepcopy(haves)
+    new_haves = deepcopy(wants)
+    wants.extend(new_wants)
+    haves.extend(new_haves)
 
     # Create the actions (buy/sell) list
     # Going from a have to a want is a BUY in the Bittrex nomenclature
@@ -285,14 +297,15 @@ def get_prices(B):
     order_actions.extend(['SELL' for bid in bids])
 
     # Create a conversions list
-    # From wants to haves you convert with the bid and the maker fee (0.16%)
-    # From haves to wants you convert with 1/ask and the taker fee (0.26%)
+    # From haves to wants you BUY & convert with 1/ask and the taker fee (0.25% for Bittrex)
+    # From wants to haves you SELL & convert with the bid and the maker fee (0.25% for Bittrex)
     # Example: Asset pair XXBTZUSD, base=have XBT, quote=want USD, conversion: 1 XBT -> 5000 USD, "selling" XBT for USD, so you are the "maker"
     # conversions = [bid * (1. - 0.0025) for bid in bids]
     # conversions.extend([(1. - 0.0025)/ask for ask in asks])
 
-    conversions = [bid * (1. - 0.0025) for bid in bids]
-    conversions.extend([(1. - 0.0025)/ask for ask in asks])
+    # Start with the BUYs
+    conversions = [(1. - 0.0025)/ask for ask in asks]
+    conversions.extend([bid * (1. - 0.0025) for bid in bids])
 
     # Create ask/bid price and volumes list
     # Use the same logic as the conversion list, start with list of bids, then extend by list of asks
