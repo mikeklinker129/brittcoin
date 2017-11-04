@@ -37,8 +37,15 @@ class PathList():
                 # Next move returns you to the original asset
                 next_moves = [path.nodes[0].name]
 
-                # Get the index of the original asset from the list of available trades
-                complete_loop_index = path.nodes[-1].avail_trades.index(next_moves[0])
+                # See if we can get back to the intial coin
+                try:
+                    # Get the index of the original asset from the list of available trades
+                    complete_loop_index = path.nodes[-1].avail_trades.index(next_moves[0])
+                # We're in too deep, cant get back to original coin
+                except:
+                    # Skip this loop
+                    continue
+
 
             for i in range(0,len(next_moves)):
 
@@ -375,7 +382,7 @@ if __name__ == '__main__':
         trial_list = []
 
         for asset in asset_list:
-            if asset.name in ['ETH']:
+            if asset.name in ['USDT']:
                 # print(asset.name, asset.avail_trades)
                 trial_list.append(asset)
             # if asset.name=='XETH':
