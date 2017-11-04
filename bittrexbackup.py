@@ -107,7 +107,7 @@ class PathList():
         return self.complete_paths[0]
 
 
-class Path(object):
+class Path():
     def __init__(self,init_node, links = [], directions = [], asset_pairs = [], order_vol_denoms = [], btc_volumes = [] ):
         self.nodes = init_node # list of Asset objects
         self.links = links    # list of numbers that link each node
@@ -137,7 +137,7 @@ class Path(object):
             node_names.append(node.name)
         # est_fee = .9974**len(self.links)
 
-        if self.value > .997:
+        if self.value > .995:
             # print("Nodes= %s \nPercent= %.6f \nDirections= %s \nPairs= %s \nLinks= %s \nVolC= %s \n\n\n" %((node_names), self.value*100, self.directions, self.asset_pairs, self.links, self.order_vol_denoms))
             print("Nodes: %s  Percent: %.6f. BTC vol: %s" %(node_names,self.value*100, self.btc_volumes))
 
@@ -351,6 +351,10 @@ def get_prices(B):
     return bittrex_data
 
 
+def executePath(path):
+
+
+
 if __name__ == '__main__':
 
 
@@ -382,7 +386,7 @@ if __name__ == '__main__':
         trial_list = []
 
         for asset in asset_list:
-            if asset.name in ['USDT']:
+            if asset.name in ['BTC']:
                 # print(asset.name, asset.avail_trades)
                 trial_list.append(asset)
             # if asset.name=='XETH':
