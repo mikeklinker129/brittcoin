@@ -8,15 +8,38 @@ import time
 import hmac
 import hashlib
 
+from io import StringIO, BytesIO
+import pycurl
+
 class BittrexAPI(object):
     
-    def __init__(self, key, secret):
-        self.key = key
-        self.secret = secret
+    def __init__(self,key_filename):
+
+
+        self.key = None
+        self.secret = None
         self.public = ['getmarkets', 'getcurrencies', 'getticker', 'getmarketsummaries', 'getmarketsummary', 'getorderbook', 'getmarkethistory']
         self.market = ['buylimit', 'buymarket', 'selllimit', 'sellmarket', 'cancel', 'getopenorders']
         self.account = ['getbalances', 'getbalance', 'getdepositaddress', 'withdraw', 'getorder', 'getorderhistory', 'getwithdrawalhistory', 'getdeposithistory']
     
+        self.load_key(key_filename)
+
+
+    def load_key(self, path):
+        """ Load key and secret from file.
+
+        Expected file format is key and secret on separate lines.
+
+        :param path: path to keyfile
+        :type path: str
+        :returns: None
+
+        """
+        with open(path, 'r') as f:
+            self.key = f.readline().strip()
+            self.secret = f.readline().strip()
+        return
+
     
     def query(self, method, values={}):
         if method in self.public:
@@ -33,14 +56,34 @@ class BittrexAPI(object):
         if method not in self.public:
             url += '&apikey=' + self.key
             url += '&nonce=' + str(int(time.time()))
-            signature = hmac.new(self.secret, url, hashlib.sha512).hexdigest()
+            signature = hmac.new(self.secret.encode(), url.encode(), hashlib.sha512).hexdigest()
             headers = {'apisign': signature}
+
+            #for curl
+            str_h = '%s: %s'%('apisign',headers['apisign'])
+            h = [  str_h  ]
         else:
+            h = []
             headers = {}
         
-        req = urllib.request.Request(url, headers=headers)
-        response = json.loads(urllib.request.urlopen(req).read())
-        
+        if True:
+            req = urllib.request.Request(url, headers=headers)
+            response = json.loads(urllib.request.urlopen(req).read())
+
+        else:
+            e = BytesIO()
+            c = pycurl.Curl()
+            c.setopt(pycurl.URL, url)
+            # c.setopt(pycurl.GET,1)
+            c.setopt(c.HTTPHEADER, h)
+            # c.setopt(c.HTTPHEADER, ['Accept: text/html', 'Accept-Charset: UTF-8'])
+            # c.setopt(c.WRITEFUNCTION, buffer.write)
+            c.setopt(pycurl.WRITEFUNCTION, e.write)
+            c.perform()
+            c.close()
+            response = json.loads(e.getvalue())
+
+
         if response["result"]:
             return response["result"]
         else:

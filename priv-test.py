@@ -1,160 +1,160 @@
-import krakenex
-import sys
-import pprint
-import numpy as np
-from copy import deepcopy
-import time
+# import krakenex
+# import sys
+# import pprint
+# import numpy as np
+# from copy import deepcopy
+# import time
 
 
-class Trader(object):
-    def __init__(self,nodes,links,directions,pairs):
+# class Trader(object):
+#     def __init__(self,nodes,links,directions,pairs):
 
-        self.nodes = nodes
-        self.links = links
-        self.directions = directions
-        self.asset_pairs= pairs
+#         self.nodes = nodes
+#         self.links = links
+#         self.directions = directions
+#         self.asset_pairs= pairs
 
-        self.k = krakenex.API()
-        self.k.load_key('kraken_key.key')
-
-
-    def execute_path(self, volume):
-
-        start_bal = self.check_balance(self.nodes[0])
-        print('Starting Balance: %s' %(start_bal))
-
-        for i in range(0,len(self.asset_pairs)):
-            start = self.nodes[i]
-            end = self.nodes[i+1]
-            buyorsell = self.directions[i]
-            conversion = self.links[i]
-            pair = self.asset_pairs[i]
-            #check to make sure we have enough coin
-            # ETHXBT
-            # XBT -> ETH = buy -> backward. pay with END
-            # ETH -> XBT = sell -> forward. pay with START
-
-            print(buyorsell)
-
-            if buyorsell=='sell':
-                volume_currency = start
-                avail_bal = self.check_balance(start)
-                volume = avail_bal
-            elif buyorsell=='buy':
-                volume_currency = end
-                avail_bal = self.check_balance(start)
-                volume = avail_bal*conversion
-
-            print('Volume Currency: %s,  Trading Volume: %s' %(volume_currency, volume))
-
-            # sys.exit()
-            # if avail_bal<volume:
-            #     print("WARNING: NOT ENOUGH VOLUME in: %s  avail: %s" %(volume,volume_currency))
-
-            #Execute the fucking trade
-            txid = self.execute_trade(pair,buyorsell,volume)
-            if txid in [-1,False]:
-                print("Trade errored out. Have fun with your shitcoin: %s" %(volume_currency))
-                # break
-
-            if txid==555: #Most likely a timeout. Wait until your currency is gone from the 'start' currency. 
-                print("Warning 555: Will have to wait to see if the currency arrives for the next trade.")
-
-                count=0
-                while count<50:
-                    after_bal = self.check_balance(volume_currency)
-                    if after_bal<avail_bal:
-                        break
-                    count+=1
-                if count>49:
-                    print("Your shitcoin (%s) probably didnt leave your shitcoin wallet" %(volume_currency))
-                    break
+#         self.k = krakenex.API()
+#         self.k.load_key('kraken_key.key')
 
 
-        end_bal = self.check_balance(self.nodes[-1])
-        print("Ending Balance: %s   Profit: %s" %(end_bal, (end_bal/start_bal) ))
+#     def execute_path(self, volume):
 
-        return end_bal>start_bal
+#         start_bal = self.check_balance(self.nodes[0])
+#         print('Starting Balance: %s' %(start_bal))
 
-    def execute_trade( self, pair, buyorsell , volume ):
-        trade_info = {  'pair':pair,
-                        'type':buyorsell,
-                        'ordertype':'market',
-                        'volume': volume,
-                        'validate':True
-                    }
-        print('Starting Order %s: %s  vol: %s' %(buyorsell,pair,volume))
-        try:
-            new_order = self.k.query_private('AddOrder', trade_info )
-            pprint.pprint(new_order)
-        except Exception as e:
-            print('ERROR:',e)
-            return 555 # See if it went through...
+#         for i in range(0,len(self.asset_pairs)):
+#             start = self.nodes[i]
+#             end = self.nodes[i+1]
+#             buyorsell = self.directions[i]
+#             conversion = self.links[i]
+#             pair = self.asset_pairs[i]
+#             #check to make sure we have enough coin
+#             # ETHXBT
+#             # XBT -> ETH = buy -> backward. pay with END
+#             # ETH -> XBT = sell -> forward. pay with START
 
-        if len(new_order['error'])>0:
-            self.handle_error(new_order['error'])
-            return False
+#             print(buyorsell)
 
-        txid = -1
-        # txid = 'O435WC-WHEN6-AQX5JT'
-        if 'txid' in new_order['result']:
-            txid = new_order['result']['txid'] 
-            print(txid)
-        return txid
+#             if buyorsell=='sell':
+#                 volume_currency = start
+#                 avail_bal = self.check_balance(start)
+#                 volume = avail_bal
+#             elif buyorsell=='buy':
+#                 volume_currency = end
+#                 avail_bal = self.check_balance(start)
+#                 volume = avail_bal*conversion
 
-    def check_balance(self, asset):
-        balance = self.k.query_private('Balance')
-        # pprint.pprint(balance)
-        asset_bal = float(balance['result'][asset])
-        # print('Asset: %s Balance: %s' %(asset,asset_bal))
-        return asset_bal
+#             print('Volume Currency: %s,  Trading Volume: %s' %(volume_currency, volume))
 
-    def is_order_closed(self, txid):
+#             # sys.exit()
+#             # if avail_bal<volume:
+#             #     print("WARNING: NOT ENOUGH VOLUME in: %s  avail: %s" %(volume,volume_currency))
 
-        if txid in [-1,False]:
-            return None
+#             #Execute the fucking trade
+#             txid = self.execute_trade(pair,buyorsell,volume)
+#             if txid in [-1,False]:
+#                 print("Trade errored out. Have fun with your shitcoin: %s" %(volume_currency))
+#                 # break
 
-        order_stat = self.k.query_private('QueryOrders', {'txid':txid})
-        pprint.pprint(order_stat)
+#             if txid==555: #Most likely a timeout. Wait until your currency is gone from the 'start' currency. 
+#                 print("Warning 555: Will have to wait to see if the currency arrives for the next trade.")
 
-        if 'result' in order_stat:
-            return order_stat['result'][txid]['status']=='closed'
-        else:
-            return None
-
-    def handle_error(self,error):
-        print('HANDLE ERROR: %s' %(error))
+#                 count=0
+#                 while count<50:
+#                     after_bal = self.check_balance(volume_currency)
+#                     if after_bal<avail_bal:
+#                         break
+#                     count+=1
+#                 if count>49:
+#                     print("Your shitcoin (%s) probably didnt leave your shitcoin wallet" %(volume_currency))
+#                     break
 
 
+#         end_bal = self.check_balance(self.nodes[-1])
+#         print("Ending Balance: %s   Profit: %s" %(end_bal, (end_bal/start_bal) ))
 
+#         return end_bal>start_bal
 
-if __name__ == '__main__':
+#     def execute_trade( self, pair, buyorsell , volume ):
+#         trade_info = {  'pair':pair,
+#                         'type':buyorsell,
+#                         'ordertype':'market',
+#                         'volume': volume,
+#                         'validate':True
+#                     }
+#         print('Starting Order %s: %s  vol: %s' %(buyorsell,pair,volume))
+#         try:
+#             new_order = self.k.query_private('AddOrder', trade_info )
+#             pprint.pprint(new_order)
+#         except Exception as e:
+#             print('ERROR:',e)
+#             return 555 # See if it went through...
+
+#         if len(new_order['error'])>0:
+#             self.handle_error(new_order['error'])
+#             return False
+
+#         txid = -1
+#         # txid = 'O435WC-WHEN6-AQX5JT'
+#         if 'txid' in new_order['result']:
+#             txid = new_order['result']['txid'] 
+#             print(txid)
+#         return txid
+
+#     def check_balance(self, asset):
+#         balance = self.k.query_private('Balance')
+#         # pprint.pprint(balance)
+#         asset_bal = float(balance['result'][asset])
+#         # print('Asset: %s Balance: %s' %(asset,asset_bal))
+#         return asset_bal
+
+#     def is_order_closed(self, txid):
+
+#         if txid in [-1,False]:
+#             return None
+
+#         order_stat = self.k.query_private('QueryOrders', {'txid':txid})
+#         pprint.pprint(order_stat)
+
+#         if 'result' in order_stat:
+#             return order_stat['result'][txid]['status']=='closed'
+#         else:
+#             return None
+
+#     def handle_error(self,error):
+#         print('HANDLE ERROR: %s' %(error))
 
 
 
-    # prepare request
-    # req_data = {'docalcs': 'true'}
 
-    # querry servers
-    # start = k.query_public('Time')
-    # open_positions = k.query_private('OpenPositions', req_data)
-    # end = k.query_public('Time')
-    # latency = (end['result']['unixtime']-start['result']['unixtime'])
-    # print(open_positions)
+# if __name__ == '__main__':
 
 
-# Nodes: XXBT,XZEC,ZEUR,XXBT  Percent: 99.932204  Dir: ['buy', 'sell', 'buy']  Pairs: ['XZECXXBT', 'XZECZEUR', 'XXBTZEUR'] Links: 
+
+#     # prepare request
+#     # req_data = {'docalcs': 'true'}
+
+#     # querry servers
+#     # start = k.query_public('Time')
+#     # open_positions = k.query_private('OpenPositions', req_data)
+#     # end = k.query_public('Time')
+#     # latency = (end['result']['unixtime']-start['result']['unixtime'])
+#     # print(open_positions)
 
 
-    Nodes=['XXBT','XZEC','ZEUR','XXBT']  
-    Directions= ['buy', 'sell', 'buy'] 
-    Links = [27.875908328675237, 197.6832, 0.00018134545454545455]
-    Pairs= ['XZECXXBT', 'XZECZEUR', 'XXBTZEUR']
+# # Nodes: XXBT,XZEC,ZEUR,XXBT  Percent: 99.932204  Dir: ['buy', 'sell', 'buy']  Pairs: ['XZECXXBT', 'XZECZEUR', 'XXBTZEUR'] Links: 
 
-    t = Trader(Nodes,Links,Directions,Pairs)
-    t.execute_path(0.003)
 
-    sys.exit()
+#     Nodes=['XXBT','XZEC','ZEUR','XXBT']  
+#     Directions= ['buy', 'sell', 'buy'] 
+#     Links = [27.875908328675237, 197.6832, 0.00018134545454545455]
+#     Pairs= ['XZECXXBT', 'XZECZEUR', 'XXBTZEUR']
+
+#     t = Trader(Nodes,Links,Directions,Pairs)
+#     t.execute_path(0.003)
+
+#     sys.exit()
 
 
     asset = 'XETH'

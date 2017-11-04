@@ -20,11 +20,14 @@ k = krakenex.API()
 
 r_asset_pairs = k.query_public('AssetPairs')
 
-# pprint.pprint(r_asset_pairs['result'].keys())
+pprint.pprint(r_asset_pairs)
+
+
+asdf
 list_pairs = r_asset_pairs['result'].keys()
-for a in list_pairs:
-    if 'XMLN' in a:
-        print(a)
+# for a in list_pairs:
+#     if 'XMLN' in a:
+#         # print(a)
 
 # pprint.pprint(list_pairs)
 # if 'XETH' in list_pairs:
@@ -32,9 +35,10 @@ for a in list_pairs:
 
 
 
-r_price_data = k.query_public('Ticker', {'pair': 'XMLNXXBT,XMLNXETH'} )
+r_price_data = k.query_public('Depth', {'pair': 'XICNXXBT', 'count':3} )
+ticker = k.query_public('Ticker', {'pair': 'XICNXXBT'} )
 pprint.pprint(r_price_data)
-
+pprint.pprint(ticker)
 
 
 sys.exit()

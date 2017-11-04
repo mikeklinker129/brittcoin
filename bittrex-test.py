@@ -70,17 +70,20 @@ class PathList():
     def show_paths(self):
 
         self.complete_paths.sort(key=lambda r: -r.value)
-        for i in range(0,1):
+        for i in range(0,5):
         # for i in range(0,len(self.complete_paths)):
             try:
                 self.complete_paths[i].print_path()
             except:
                 continue
 
+        print('\n')
+
 
     def return_best(self):
         self.complete_paths.sort(key=lambda r: -r.value)
         return self.complete_paths[0]
+
 
 class Path(object):
     def __init__(self,init_node, links = [], directions = [], asset_pairs = [], order_vol_denoms = [] ):
@@ -111,9 +114,17 @@ class Path(object):
             node_names.append(node.name)
         # est_fee = .9974**len(self.links)
 
-        if self.value > .8:
-            print("Nodes= %s \nPercent= %.6f \nDirections= %s \nPairs= %s \nLinks= %s \nVolC= %s \n\n\n" %((node_names), self.value*100, self.directions, self.asset_pairs, self.links, self.order_vol_denoms))
-            
+        if self.value > .99:
+            # print("Nodes= %s \nPercent= %.6f \nDirections= %s \nPairs= %s \nLinks= %s \nVolC= %s \n\n\n" %((node_names), self.value*100, self.directions, self.asset_pairs, self.links, self.order_vol_denoms))
+            print("Nodes: %s  Percent: %.6f" %(node_names,self.value*100))
+
+            with open('log_file2.csv','a') as w:
+                string=''
+                for i in range(0,len(node_names)-1):
+                    string += node_names[i] + ','
+                string+='%.6f \n'%(self.value*100.0)
+                print(string)
+                w.write(string)
 
     # def __append__():
     #     check left, check right
@@ -157,15 +168,13 @@ class Asset():
 
 
 
-def get_prices():
+def get_prices(B, asset_pairs_dict):
     '''
     Get prices from Bittrex API
+
+    Inputs: Bittrex API Object, B. 
+            asset_pairs_dict = asset pairs from Bittrex. 
     '''
-
-    B = BittrexAPI('abc','defg') # Start the API
-    #asset_pairs_dict = k.query_public('AssetPairs')['result'] # Get lists of available asset pairs
-    asset_pairs_dict = B.getmarkets()
-
 
     # Loop over the asset pairs to get the pair, base, and quote strings
     pairs = []
@@ -190,8 +199,10 @@ def get_prices():
 
 
     # Call the Bittrex API to get all the asks and bids
+    t0 = datetime.datetime.now()
     price_dict = B.getmarketsummaries()
-
+    t1 = datetime.datetime.now()
+    print("Market Summary Response Time: %.4f" %((t1-t0).total_seconds()))
 
     # We don't know if they are in the correct indexes, so loop through to fill the arrays. 
     asks     = []
@@ -278,48 +289,152 @@ def get_prices():
 
 if __name__ == '__main__':
 
+
+
+    B = BittrexAPI('bittrex_key.key') # Start the API
+    #asset_pairs_dict = k.query_public('AssetPairs')['result'] # Get lists of available asset pairs
+    # asset_pairs_dict = B.getmarkets()
+
+
+
+
+    # resp = (B.getbalances())
+    # pprint.pprint(resp)
+    # for r in resp:
+    #     if r['Currency']=='BTC':
+    #         volume2 = r['Available']
+    #         print("VOLUME btc: ",volume2)
+
+    # assetpair = 'BTC-ETH'
+    # M = B.getmarketsummary(assetpair)
+
+
+
+    # print('Ask: ',M[0]['Ask'])
+    # print('Bid: ',M[0]['Bid'])
+
+    # ask = M[0]['Ask']*(1-0.001)
+    # bid = M[0]['Bid']*(1+0.001)
+
+    # print('Ask: ',ask)
+    # print('Bid: ',bid)
+
+
+    # # sys.exit()
+
+    # t0=datetime.datetime.now()
+
+    # volume1 = 15/300.0
+    # # volume2 = 13/300.0
+    
+    # print('buying')
+    # resp = B.buylimit(assetpair,volume1,bid)
+    # pprint.pprint(resp)
+
+    # uuid = None
+    # if 'uuid' in resp:
+    #     uuid = resp['uuid']
+    # else:
+    #     print('No UUID')
+    #     sys.exit()
+
+    # # avail = 0.0
+    # # while avail==0.0:
+    # #     resp = (B.getbalances())
+    # #     for r in resp:
+    # #         if r['Currency']=='ETH':
+    # #             volume2 = r['Available']
+    # #             print("VOLUME eth: ",volume2)
+    # #             avail = float(volume2)
+
+    # print('selling')
+
+    # resp = 'INSUFFICIENT_FUNDS'
+    # count = 0
+    # while resp=='INSUFFICIENT_FUNDS':
+    #     resp = B.selllimit(assetpair,volume1,ask)
+    #     # resp = B.getorder('80210115-0b95-470a-a090-4040213e9f72')
+    #     pprint.pprint(resp)
+    #     if count>8:
+    #         B.cancel(uuid)
+    #         print('cancelled')
+    #         break
+    #     count+=1
+
+    # # avail = 0.0
+    # # while avail==0.0:
+    # #     resp = (B.getbalances())
+    # #     for r in resp:
+    # #         if r['Currency']=='BTC':
+    # #             volume2 = r['Available']
+    # #             print("VOLUME btc: ",volume2)
+    # #             avail = float(volume2)
+
+
+
+    # t1= datetime.datetime.now()
+    # print("Time: %.4f" %((t1-t0).total_seconds()))
+    
+    # resp = (B.getbalances())
+    # print(resp)
+    # for r in resp:
+    #     if r['Currency']=='BTC':
+    #         volume2 = r['Available']
+    #         print("VOLUME btc: ",volume2)
+
+    # sys.exit()
+
+    count = 0
     while True:
-    # Get the data from Kraken
-    # Get the data from Kraken
-
-        # try:
-        exchange_data = get_prices()
-        # except Exception as e:
-        #     print(e)
-        #     time.sleep(5)
-        #     continue    
-
-        # Loop over the assets and make a list
-        asset_list = []
-        for asset in exchange_data['unique']:
-
-            # Make an instance of the Asset class with that asset's name
-            exec(asset + '= Asset(exchange_data,\'' + asset + '\')')
-
-            # Append the Asset instance to the list
-            asset_list.append(eval(asset))
-
-        trial_list = []
-
-        for asset in asset_list:
-            if asset.name in ['BTC']:
-                # print(asset.name, asset.avail_trades)
-                trial_list.append(asset)
-            # if asset.name=='XETH':
-            #     trial_list.append(asset)
-
         
-        # trial_list = asset_list
-        master_path = PathList(asset_list,trial_list)
-        # print("god help us")
-        for i in range(0,3):
-            master_path.step()
+        try:
+            if count%100==0:
+                t0 = datetime.datetime.now()
+                asset_pairs_dict = B.getmarkets()
+                t1 = datetime.datetime.now()
+                print("Asset Dictionary Response Time: %.4f" %((t1-t0).total_seconds()))
+            # try:
+            exchange_data = get_prices(B,asset_pairs_dict)
+            # except Exception as e:
+            #     print(e)
+            #     time.sleep(5)
+            #     continue    
 
-        master_path.show_paths()
-        best_path = master_path.return_best()
+            # Loop over the assets and make a list
+            asset_list = []
+            for asset in exchange_data['unique']:
 
-        time.sleep(0)
+                # Make an instance of the Asset class with that asset's name
+                exec(asset + '= Asset(exchange_data,\'' + asset + '\')')
 
+                # Append the Asset instance to the list
+                asset_list.append(eval(asset))
+
+            trial_list = []
+
+            for asset in asset_list:
+                if asset.name in ['BTC']:
+                    # print(asset.name, asset.avail_trades)
+                    trial_list.append(asset)
+                # if asset.name=='XETH':
+                #     trial_list.append(asset)
+
+            
+            # trial_list = asset_list
+            master_path = PathList(asset_list,trial_list)
+            # print("god help us")
+            t0 = datetime.datetime.now()
+            for i in range(0,3):
+                master_path.step()
+            t1 = datetime.datetime.now()
+            print("Path Build Time: %.4f" %((t1-t0).total_seconds()))
+
+            master_path.show_paths()
+            best_path = master_path.return_best()
+
+            count+=1
+        except Exception as e:
+            time.sleep(5)
 
 
 
