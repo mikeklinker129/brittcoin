@@ -30,7 +30,6 @@ class PathList():
         for path in self.path_list:
 
             next_moves  = path.nodes[-1].avail_trades
-            # print('Next Moves: ',next_moves)
 
             # If we're on the final step, return to the initial asset
             if final_step:
@@ -61,6 +60,7 @@ class PathList():
                 asset_pair       = path.nodes[-1].pair_names[i]
                 order_vol_denoms = path.nodes[-1].order_vol_denoms[i]
                 btc_volumes      = path.nodes[-1].btc_volumes[i]
+                order_price      = path.nodes[-1].order_prices[i]
 
                 #move is a string
                 for asset in self.asset_list:
@@ -73,8 +73,9 @@ class PathList():
                 new_asset_pair = (path.asset_pairs+ [ asset_pair ])
                 new_order_vol_denoms = (path.order_vol_denoms + [ order_vol_denoms ])
                 new_btc_volumes = (path.btc_volumes + [ btc_volumes ])
+                new_order_prices = (path.order_prices + [ order_price ])
 
-                new_path = Path(new_nodes, new_links, new_directions, new_asset_pair, new_order_vol_denoms, new_btc_volumes)
+                new_path = Path(new_nodes, new_links, new_directions, new_asset_pair, new_order_vol_denoms, new_btc_volumes, new_order_prices)
                 new_path_list.append(new_path)
 
         self.path_list = new_path_list
@@ -108,15 +109,16 @@ class PathList():
 
 
 class Path():
-    def __init__(self,init_node, links = [], directions = [], asset_pairs = [], order_vol_denoms = [], btc_volumes = [] ):
+    def __init__(self,init_node, links = [], directions = [], asset_pairs = [], order_vol_denoms = [], btc_volumes = [] , order_prices=[]):
         self.nodes = init_node # list of Asset objects
         self.links = links    # list of numbers that link each node
-        self.directions = directions
-        self.asset_pairs = asset_pairs
+        self.directions = directions #buy or sell
+        self.asset_pairs = asset_pairs # 
         self.order_vol_denoms = order_vol_denoms
         self.btc_volumes = btc_volumes
+        self.order_prices = order_prices
 
-        self.value = self.compute_val()  
+        self.value = self.compute_val() # product of links
         self.length = len(self.nodes)
 
     def compute_val(self):
@@ -141,7 +143,7 @@ class Path():
             # print("Nodes= %s \nPercent= %.6f \nDirections= %s \nPairs= %s \nLinks= %s \nVolC= %s \n\n\n" %((node_names), self.value*100, self.directions, self.asset_pairs, self.links, self.order_vol_denoms))
             print("Nodes: %s  Percent: %.6f. BTC vol: %s" %(node_names,self.value*100, self.btc_volumes))
 
-            if True:
+            if False:
                 with open('log_file3.csv','a') as w:
                     string=''
                     for i in range(0,len(node_names)-1):
@@ -315,9 +317,10 @@ def get_prices(B):
     conversions.extend([bid * (1. - 0.0025) for bid in bids])
 
     # Create ask/bid price and volumes list
-    # Use the same logic as the conversion list, start with list of bids, then extend by list of asks
-    order_prices  = deepcopy(bids)
-    order_prices.extend(deepcopy(asks))
+    # Use the same logic as the conversion list, start with list of asks, then extend by list of bids
+    # start with the buys. 
+    order_prices  = deepcopy(asks)
+    order_prices.extend(deepcopy(bids))
     # order_volumes = deepcopy(bid_vols).extend(deepcopy(ask_vols))
 
     # You will need the pairs to place the order later. Just repeat it
@@ -351,27 +354,107 @@ def get_prices(B):
     return bittrex_data
 
 
-def executePath(path):
+def executePath(path, amount_in_BTC , min_value = 1.0015 , overshoot_frac = .25, max_overshoot = .0005 ,debug = False):
+    '''
+    overshoot frac: fraction of the gains that we are willing to lose to make trade go through quickly. 
+        ex: path.value=1.1, making 10% on trade, if overshoot=.25, only making 7.5% of the trade. Rest goes to bid/ask padding
+    max_overshoot: maximum fraction you are willing to overshoot.     
+    '''
+    #If the value of this path is lower than the min_percentage, return. 
+    if not debug:
+        if path.value<min_value:
+            print('DEBUG: Do not execute')
+            return False
+
+        if min_value-max_overshoot<1.00001:
+            return False 
+
+        if path.nodes[0].name!='BTC':
+            return False
+
+    #This is a number, not a percentage.     
+    overshoot = min( overshoot_frac*(path.value-1), max_overshoot )
+
+    #Get hte index of the trade that we need to overshoot. 
+    overshoots = [overshoot*btc_vol/sum(path.btc_volumes) for btc_vol in path.btc_volumes]
+
+    limit_prices = []
+    amounts_in_market = []
+
+    # As we go around the loop, track the amount of currency we need to input.
+    # start with BTC, or other input
+    amount_in_current_asset = amount_in_BTC
+
+    #Loop over the links between nodes.
+    for i in range(path.length-1):
+        # if it is a buy, pay more than the ask by the overshoot. 
+        # buy the amount in the asset
+        if path.directions[i]=='BUY':
+            limit_prices.append( path.order_prices[i] * (1+overshoots[i]) ) 
+            amounts_in_market.append(amount_in_current_asset*path.links[i])
+
+        # if it is a sell, sell for less than the bid by the overshoot.
+        # sell the amount of your current asset
+        elif path.directions[i]=='SELL':
+            limit_prices.append( path.order_prices[i] * (1-overshoots[i]) ) 
+            amounts_in_market.append(amount_in_current_asset)
+        else:
+            return False
+
+        #Step the amount in current asset to the next index
+        amount_in_current_asset*=path.links[i]
+
+    #TODO: check balance of BTC
+
+    print(amounts_in_market)
+    print(limit_prices)
+
+    uuids = []
+
+    # # Loop through again and execute some trades yo
+    # for i in range(path.length-1):
+
+    #     if path.directions[i]=='BUY':
+    #         print("Buying %s. Amount: %s. Price; %s" %( path.asset_pairs[i], amounts_in_market[i], limit_prices[i]) )
+    #         resp = B.buylimit( path.asset_pairs[i], amounts_in_market[i], limit_prices[i])
+    #         pprint.pprint(resp)
+
+    #         uuid = None
+    #         if 'uuid' in resp:
+    #             uuid = resp['uuid']
+    #         else:
+    #             print('No UUID. ENJOY YOUR SHITCOIN')
+    #             return False
+
+    #     elif path.directions[i]=='SELL':
+    #         print("Buying %s. Amount: %s. Price; %s" %( path.asset_pairs[i], amounts_in_market[i], limit_prices[i]) )
+    #         resp = B.selllimit( path.asset_pairs[i], amounts_in_market[i], limit_prices[i])
+    #         pprint.pprint(resp)
+
+    #         uuid = None
+    #         if 'uuid' in resp:
+    #             uuid = resp['uuid']
+    #         else:
+    #             print('No UUID. ENJOY YOUR SHITCOIN')
+    #             return False
+
+    #     uuids.append(uuid)
+
+    #     if uuid=='INSUFFICIENT_FUNDS':
+
+
+
 
 
 
 if __name__ == '__main__':
 
-
-
     B = BittrexAPI('bittrex_key.key') # Start the API
-    #asset_pairs_dict = k.query_public('AssetPairs')['result'] # Get lists of available asset pairs
-    # asset_pairs_dict = B.getmarkets()
-
 
     count = 0
     while True:
         
-
-
         exchange_data = get_prices(B)
-
-
 
         # Loop over the assets and make a list
         asset_list = []
@@ -387,18 +470,17 @@ if __name__ == '__main__':
 
         for asset in asset_list:
             if asset.name in ['BTC']:
-                # print(asset.name, asset.avail_trades)
                 trial_list.append(asset)
-            # if asset.name=='XETH':
-            #     trial_list.append(asset)
 
-        
         # trial_list = asset_list
         master_path = PathList(asset_list,trial_list)
         # print("god help us")
         t0 = datetime.datetime.now()
-        for i in range(0,3):
-            if i<2:
+
+        N = 5
+
+        for i in range(0,N):
+            if i<N-1:
                 master_path.step()
             else:
                 master_path.step(final_step=True)
@@ -407,6 +489,8 @@ if __name__ == '__main__':
 
         master_path.show_paths()
         best_path = master_path.return_best()
+
+        executePath(best_path,1.0, debug=True)
 
         count+=1
 
